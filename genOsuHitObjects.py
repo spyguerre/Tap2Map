@@ -3,10 +3,10 @@ import math
 
 
 # Map settings
-bpm = 200
+bpm = 178
 maxBeatDiv = 4
-time = 2481
-recordSpeed = 0.8
+time = 56
+recordSpeed = 1
 maxTurnSpeed = math.pi/3
 distancePerBeat = 30
 
@@ -56,7 +56,7 @@ for i in range(len(cleanedInputs)):
         pos[1] = 2*384 - pos[1]
         vect = math.pi - vect
         vectSpeed = -vectSpeed
-    if not 0 <= pos[0] <= 512 and 0 <= pos[1] <= 384:
+    if not (0 <= pos[0] <= 512 and 0 <= pos[1] <= 384):
         pos = [random.uniform(0, 512), random.uniform(0, 384)]
 
     hitObjectsPos.append(pos)

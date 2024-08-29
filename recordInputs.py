@@ -21,13 +21,7 @@ def on_click(x, y, button, pressed):
     # Start/Stop Recording
     if button == Button.middle and pressed:
         if not recording:
-            print("Starting recording in 3...")
-            time.sleep(1)
-            print("Starting recording in 2...")
-            time.sleep(1)
-            print("Starting recording in 1...")
-            time.sleep(1)
-            print("Started recording")
+            print("Started recording...")
             startRecTime = time.time()
         else:
             print("Stopped recording.")
