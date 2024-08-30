@@ -1,0 +1,47 @@
+osu file format v128
+
+[General]
+AudioFilename: song.mp3
+AudioLeadIn: 0
+PreviewTime: -1
+Countdown: 1
+SampleSet: Normal
+StackLeniency: 0.7
+Mode: 0
+LetterboxInBreaks: 0
+WidescreenStoryboard: 1
+SamplesMatchPlaybackRate: 1
+
+[Editor]
+DistanceSpacing: 1
+BeatDivisor: 1
+GridSize: 4
+TimelineZoom: 1
+
+[Metadata]
+Title:
+TitleUnicode:
+Artist:
+ArtistUnicode:
+Creator:
+Version: Banger/20
+Source:
+Tags:
+
+[Difficulty]
+HPDrainRate: 4.2
+CircleSize: 4.2
+OverallDifficulty: 4.2
+ApproachRate: 9.3
+SliderMultiplier: 1.4
+SliderTickRate: 1
+
+[Events]
+
+[TimingPoints]
+<startTime>,<osuBeatLength>,<maxBeatDiv>,1,0,100,1,0
+
+[Colours]
+
+[HitObjects]
+<hitObjects>

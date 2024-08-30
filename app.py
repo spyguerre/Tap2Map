@@ -3,6 +3,8 @@ import os
 import pygame
 import math
 from datetime import datetime
+import random
+import shutil
 
 
 def defineWidgets():
@@ -19,7 +21,7 @@ def defineWidgets():
     volume.set(.42)
     play_button = tk.Button(root, text="Play Song!", font=("Helvetica", 20), relief=tk.GROOVE, command=play,
                             fg="#bc51e0")
-    label2 = tk.Label(root, text="Click on the button above or start tapping (with E & R) to start recording inputs!",
+    label2 = tk.Label(root, text="Click on the button above to start recording inputs!",
                       font=("times new roman", 15, "bold"))
     countdown = tk.Label(root, font=("times new roman", 42, "bold"))
     cancelButton = tk.Button(root, text="Cancel Recording", font=("Helvetica", 20), relief=tk.GROOVE,
@@ -32,15 +34,147 @@ def defineWidgets():
                         relief=tk.RAISED, width=5)
     rButton = tk.Button(keysFrame, text="R", font=("times new roman", 25, "bold"), state=tk.DISABLED,
                         relief=tk.RAISED, width=5)
+    settingsFrame = tk.Frame(root)
+    bpmTxt = tk.Entry(settingsFrame, width=5)
+    maxBeatDivTxt = tk.Entry(settingsFrame, width=2)
+    startTimeTxt = tk.Entry(settingsFrame, width=6)
+    inputOffsetTxt = tk.Entry(settingsFrame, width=4)
+    maxTurnSpeedTxt = tk.Entry(settingsFrame, width=3)
+    distancePerBeatTxt = tk.Entry(settingsFrame, width=3)
+    genMapButton = tk.Button(root, text="Generate Map!", font=("Helvetica", 20, "bold"), relief=tk.GROOVE,
+                             command=genOsuMapFolder, fg="#bc51e0")
+    label3 = tk.Label(root, text="Fill in the settings above and click the button to generate the map!",
+                      font=("times new roman", 15, "bold"))
+    label4 = tk.Label(root, text="            BPM                   Max Beat Div                Start Time"
+                                 "                  Input Offset         Max Turn Speed    Distance Per Beat",
+                      font=("times new roman", 10, "bold"))
+    smallBlank = tk.Label(root, text="", font=("times new roman", 5))
+
 
     return (title, inputtxt, dlButton, label1, volume, play_button, label2, countdown, cancelButton, saveRecButton,
-            timeLabel, keysFrame, eButton, rButton)
+            timeLabel, keysFrame, eButton, rButton, genMapButton, settingsFrame, bpmTxt, maxBeatDivTxt, startTimeTxt,
+            inputOffsetTxt, maxTurnSpeedTxt, distancePerBeatTxt, label3, label4, smallBlank)
 
 
 def clearScreen():
     for widget in root.winfo_children():
         widget.pack_forget()
 
+
+def formatMap(startTime, osuBeatLength, maxBeatDiv, hitObjects):
+    template = open("format.txt", "r").read()
+
+    template = template.replace("<startTime>", str(startTime))
+    template = template.replace("<osuBeatLength>", str(osuBeatLength))
+    template = template.replace("<maxBeatDiv>", str(maxBeatDiv))
+    template = template.replace("<hitObjects>", hitObjects)
+
+    return template
+
+
+def writeMapFolder(startTime, bpm, maxBeatDiv, hitObjectsText):
+    if not os.path.isdir("./map/"):
+        os.mkdir("./map/")
+
+    open("map/-song_name- (-mapper-) [-difficulty_name-].osu", "w").write(
+        formatMap(startTime, 60/bpm*1000, maxBeatDiv, hitObjectsText)
+    )
+
+    shutil.copyfile("song.mp3", "./map/song.mp3")
+
+
+def computePositions(cleanedInputs, beatLength, maxTurnSpeed, distancePerBeat):
+    pos = [random.uniform(0, 512), random.uniform(0, 384)]
+    vect = random.uniform(0, 2 * math.pi)
+    vectSpeed = 0
+    hitObjectsPos = []
+    for i in range(len(cleanedInputs)):
+        if i == 0:
+            closeness = 1
+        else:
+            closeness = (cleanedInputs[i] - cleanedInputs[i - 1]) / beatLength
+        vectSpeed += (closeness ** 3) * random.uniform(-maxTurnSpeed, maxTurnSpeed)
+        vectSpeed = min(max(-maxTurnSpeed, vectSpeed), maxTurnSpeed)
+
+        vect += vectSpeed
+
+        pos = [pos[0] + math.cos(vect) * distancePerBeat * closeness,
+               pos[1] + math.sin(vect) * distancePerBeat * closeness]
+        if pos[0] < 0:
+            pos[0] = -pos[0]
+            vect = math.pi - vect
+            vectSpeed = -vectSpeed
+        elif pos[0] > 512:
+            pos[0] = 2 * 512 - pos[0]
+            vect = math.pi - vect
+            vectSpeed = -vectSpeed
+        if pos[1] < 0:
+            pos[1] = -pos[1]
+            vect = math.pi - vect
+            vectSpeed = -vectSpeed
+        elif pos[1] > 384:
+            pos[1] = 2 * 384 - pos[1]
+            vect = math.pi - vect
+            vectSpeed = -vectSpeed
+        if not (0 <= pos[0] <= 512 and 0 <= pos[1] <= 384):
+            pos = [random.uniform(0, 512), random.uniform(0, 384)]
+
+        hitObjectsPos.append(pos)
+
+    return hitObjectsPos
+
+
+def cleanInputs(inputs, time, beatLength, inputOffset):
+    # Function puts hit objects timings on the closest hard beat
+
+    # cleanedInputs1 contains input list with inputs converted to miliseconds
+    # and inputs that are too close to each other removed, compared to beat length
+    cleanedInputs1 = []
+    for input_ in inputs:
+        input_ *= 1000
+        if not cleanedInputs1:
+            cleanedInputs1.append(input_)
+        elif input_ > cleanedInputs1[-1] + beatLength/2:
+            cleanedInputs1.append(input_)
+
+    # cleanedInputs2 contains the list of inputs with corrected offsets
+    cleanedInputs2 = []
+    for input_ in cleanedInputs1:
+        input_ = round((input_ - inputOffset - time) / beatLength) * beatLength + time
+        cleanedInputs2.append(input_)
+
+    return cleanedInputs2
+
+
+def genOsuMapFolder():
+    # Map settings
+    bpm = float(bpmTxt.get())
+    maxBeatDiv = int(maxBeatDivTxt.get())
+    time = float(startTimeTxt.get())
+    inputOffset = int(inputOffsetTxt.get())
+    maxTurnSpeed = int(maxTurnSpeedTxt.get())/360*2*math.pi
+    distancePerBeat = int(distancePerBeatTxt.get())
+
+    # Read data from recording.txt
+    inputs = open("recording.txt").readlines()
+    inputs = [float(input_[:-2]) for input_ in inputs]
+    beatLength = 60 / bpm * 1000 / maxBeatDiv
+
+    # Set inputs on the beats and remove the duplicates
+    cleanedInputs = cleanInputs(inputs, time, beatLength, inputOffset)
+
+    # Compute random hit objects' position
+    hitObjectsPos = computePositions(cleanedInputs, beatLength, maxTurnSpeed, distancePerBeat)
+
+    hitObjectsText = "\n".join([
+        f"{hitObjectsPos[i][0]},{hitObjectsPos[i][1]},{cleanedInputs[i]},{5 if i == 0 else 1},0,1:0:0:0:" for i in
+        range(len(cleanedInputs))
+    ])
+
+    writeMapFolder(time, bpm, maxBeatDiv, hitObjectsText)
+
+    genMapButton.config(state=tk.DISABLED, text="Map Generated!", bg="#22e06b")
+    root.after(5000, lambda: genMapButton.config(state=tk.NORMAL, text="Generate Map!", bg="#f0f0f0"))
 
 def saveRecording():
     open("recording.txt", "w").write(buffer)
@@ -74,10 +208,11 @@ def play():
     cancelButton.pack(pady=20)
 
     countdown.config(text="3")
-    root.after(1000, lambda: countdown.config(text="2"))
-    root.after(2000, lambda: countdown.config(text="1"))
-    root.after(3000, lambda: countdown.config(text="Tap to Map using E and R..."))
-    root.after(3000, playSong)
+    osuBeatLength = int(60 / int(bpmTxt.get()) * 1000) if bpmTxt.get() != "" else 1000
+    root.after(osuBeatLength, lambda: countdown.config(text="2"))
+    root.after(2*osuBeatLength, lambda: countdown.config(text="1"))
+    root.after(3*osuBeatLength, lambda: countdown.config(text="Tap to Map using E and R..."))
+    root.after(3*osuBeatLength, playSong)
 
 
 def updateTimeLabel():
@@ -112,7 +247,7 @@ def showMain():
 
     inputtxt.pack(pady=20)
 
-    dlButton.pack(pady=20)
+    dlButton.pack()
 
     label1.pack(pady=20)
 
@@ -121,6 +256,22 @@ def showMain():
     play_button.pack()
 
     label2.pack(pady=20)
+
+    label4.pack()
+
+    settingsFrame.pack()
+    bpmTxt.pack(side=tk.LEFT, padx=42)
+    maxBeatDivTxt.pack(side=tk.LEFT, padx=42)
+    startTimeTxt.pack(side=tk.LEFT, padx=42)
+    inputOffsetTxt.pack(side=tk.LEFT, padx=42)
+    maxTurnSpeedTxt.pack(side=tk.LEFT, padx=42)
+    distancePerBeatTxt.pack(side=tk.LEFT, padx=42)
+
+    smallBlank.pack()
+
+    genMapButton.pack()
+
+    label3.pack(pady=20)
 
 
 def onKeyPress(event):
@@ -154,12 +305,13 @@ def onKeyRelease(event):
 if __name__ == "__main__":
     root = tk.Tk()
     root.title('Osu! Tap2Map')
-    root.geometry("842x642")
+    root.geometry("842x690")
     pygame.init()
     pygame.mixer.init()
 
     (title, inputtxt, dlButton, label1, volume, play_button, label2, countdown, cancelButton,
-     saveRecButton, timeLabel, keysFrame, eButton, rButton) = defineWidgets()
+     saveRecButton, timeLabel, keysFrame, eButton, rButton, genMapButton, settingsFrame, bpmTxt, maxBeatDivTxt, startTimeTxt,
+     inputOffsetTxt, maxTurnSpeedTxt, distancePerBeatTxt, label3, label4, smallBlank) = defineWidgets()
 
     state = "main"
     t0 = datetime.now()
