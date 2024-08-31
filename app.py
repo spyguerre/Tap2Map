@@ -83,48 +83,79 @@ def writeMapFolder(startTime, bpm, maxBeatDiv, hitObjectsText):
     shutil.copyfile("song.mp3", "./map/song.mp3")
 
 
+def findIndexForXmsBack(inputList, i, ms):
+    inputTime = inputList[i]
+    res = 0
+    while inputList[res] < inputTime - ms:
+        res += 1
+    res -= 1
+    return res
+
+
+def checkPositions(inputList, osuPixels):
+    # Returns wether the last circle from the list is at least this many osu pixels away from any other
+    for i in range(len(inputList) - 1):
+        if math.sqrt((inputList[i][0] - inputList[-1][0])**2 + (inputList[i][1] - inputList[-1][1])**2) < osuPixels:
+            return False
+    return True
+
+
 def computePositions(cleanedInputs, beatLength, maxTurnSpeed, distancePerBeat):
     pos = [random.uniform(0, 512), random.uniform(0, 384)]
     vect = random.uniform(0, 2 * math.pi)
     vectSpeed = 0
     hitObjectsPos = []
-    for i in range(len(cleanedInputs)):
-        if i == 0:
-            closeness = 1
-        else:
-            closeness = (cleanedInputs[i] - cleanedInputs[i - 1]) / beatLength
-        vectSpeed += (closeness ** 3) * random.uniform(-maxTurnSpeed, maxTurnSpeed)
-        vectSpeed = min(max(-maxTurnSpeed, vectSpeed), maxTurnSpeed)
+    i = 0
+    while i < len(cleanedInputs):
+        correctFlag = False
+        tries = 0
+        while not correctFlag and tries < 42:
+            if i == 0:
+                closeness = 1
+            else:
+                closeness = (cleanedInputs[i] - cleanedInputs[i - 1]) / beatLength
+            vectSpeed += (closeness ** 3) * random.uniform(-maxTurnSpeed, maxTurnSpeed)
+            vectSpeed = min(max(-maxTurnSpeed, vectSpeed), maxTurnSpeed)
 
-        vect += vectSpeed
+            vect += vectSpeed
 
-        pos = [pos[0] + math.cos(vect) * distancePerBeat * closeness,
-               pos[1] + math.sin(vect) * distancePerBeat * closeness]
-        if pos[0] < 0:
-            pos[0] = -pos[0]
-            vect = math.pi - vect
-            vectSpeed = -vectSpeed
-        elif pos[0] > 512:
-            pos[0] = 2 * 512 - pos[0]
-            vect = math.pi - vect
-            vectSpeed = -vectSpeed
-        if pos[1] < 0:
-            pos[1] = -pos[1]
-            vect = math.pi - vect
-            vectSpeed = -vectSpeed
-        elif pos[1] > 384:
-            pos[1] = 2 * 384 - pos[1]
-            vect = math.pi - vect
-            vectSpeed = -vectSpeed
-        if not (0 <= pos[0] <= 512 and 0 <= pos[1] <= 384):
-            pos = [random.uniform(0, 512), random.uniform(0, 384)]
+            pos = [pos[0] + math.cos(vect) * distancePerBeat * closeness,
+                   pos[1] + math.sin(vect) * distancePerBeat * closeness]
+            if pos[0] < 0:
+                pos[0] = -pos[0]
+                vect = math.pi - vect
+                vectSpeed = -vectSpeed
+            elif pos[0] > 512:
+                pos[0] = 2 * 512 - pos[0]
+                vect = math.pi - vect
+                vectSpeed = -vectSpeed
+            if pos[1] < 0:
+                pos[1] = -pos[1]
+                vect = math.pi - vect
+                vectSpeed = -vectSpeed
+            elif pos[1] > 384:
+                pos[1] = 2 * 384 - pos[1]
+                vect = math.pi - vect
+                vectSpeed = -vectSpeed
+            if not (0 <= pos[0] <= 512 and 0 <= pos[1] <= 384):
+                pos = [random.uniform(0, 512), random.uniform(0, 384)]
 
-        hitObjectsPos.append(pos)
+            backTo = findIndexForXmsBack(cleanedInputs, i, 1000)
+            correctFlag = checkPositions(hitObjectsPos[backTo:], distancePerBeat*0.9)
+            tries += 1
+
+            if correctFlag:
+                hitObjectsPos.append(pos)
+                i += 1
+            elif tries == 42:
+                print(i, backTo)
+                i = backTo
+                hitObjectsPos = hitObjectsPos[:backTo]
 
     return hitObjectsPos
 
 
-def cleanInputs(inputs, time, beatLength, inputOffset):
+def cleanInputs(inputs, time, beatLength, maxBeatDiv, inputOffset):
     # Function puts hit objects timings on the closest hard beat
 
     # cleanedInputs1 contains input list with inputs converted to miliseconds
@@ -143,7 +174,33 @@ def cleanInputs(inputs, time, beatLength, inputOffset):
         input_ = round((input_ - inputOffset - time) / beatLength) * beatLength + time
         cleanedInputs2.append(input_)
 
-    return cleanedInputs2
+    # cleanedInputs3 contains the list of inputs corrcted to the closest hard beat (if alone)
+    cleanedInputs3 = []
+    osuBeatLength = beatLength * maxBeatDiv
+    for i, input_ in enumerate(cleanedInputs2):
+        correctedInput = round((input_ - time) / osuBeatLength) * osuBeatLength + time
+        if i == 0:
+            if (input_ <= cleanedInputs2[i+1] - osuBeatLength/4 + .0000001
+                    and abs(correctedInput - input_) <= osuBeatLength/8 + .0000001):
+                cleanedInputs3.append(correctedInput)
+            else:
+                cleanedInputs3.append(input_)
+        elif i == len(cleanedInputs2) - 1:
+            if (cleanedInputs3[i-1] + osuBeatLength/4 <= input_ + .0000001
+                    and abs(correctedInput - input_) <= osuBeatLength/8 + .0000001):
+                cleanedInputs3.append(correctedInput)
+            else:
+                cleanedInputs3.append(input_)
+        else:
+            if (cleanedInputs3[i-1] + osuBeatLength/4
+                    <= input_ + .0000001
+                    <= cleanedInputs2[i+1] - osuBeatLength/4 + .0000002
+                    and abs(correctedInput - input_) <= osuBeatLength/8 + .0000001):
+                cleanedInputs3.append(correctedInput)
+            else:
+                cleanedInputs3.append(input_)
+
+    return cleanedInputs3
 
 
 def genOsuMapFolder():
@@ -161,7 +218,7 @@ def genOsuMapFolder():
     beatLength = 60 / bpm * 1000 / maxBeatDiv
 
     # Set inputs on the beats and remove the duplicates
-    cleanedInputs = cleanInputs(inputs, time, beatLength, inputOffset)
+    cleanedInputs = cleanInputs(inputs, time, beatLength, maxBeatDiv, inputOffset)
 
     # Compute random hit objects' position
     hitObjectsPos = computePositions(cleanedInputs, beatLength, maxTurnSpeed, distancePerBeat)
@@ -208,6 +265,7 @@ def play():
     cancelButton.pack(pady=20)
 
     countdown.config(text="3")
+    pygame.mixer.music.load("song.mp3")
     osuBeatLength = int(60 / int(bpmTxt.get()) * 1000) if bpmTxt.get() != "" else 1000
     root.after(osuBeatLength, lambda: countdown.config(text="2"))
     root.after(2*osuBeatLength, lambda: countdown.config(text="1"))
@@ -226,7 +284,6 @@ def updateTimeLabel():
 
 def playSong():
     global t0
-    pygame.mixer.music.load("song.mp3")
     updateVolume()
     pygame.mixer.music.play()
     t0 = datetime.now()

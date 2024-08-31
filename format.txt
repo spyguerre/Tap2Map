@@ -37,6 +37,7 @@ SliderMultiplier: 1.4
 SliderTickRate: 1
 
 [Events]
+0,0,"bg.png",0,0
 
 [TimingPoints]
 <startTime>,<osuBeatLength>,<maxBeatDiv>,1,0,100,1,0
