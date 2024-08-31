@@ -105,6 +105,7 @@ def computePositions(cleanedInputs, beatLength, maxTurnSpeed, distancePerBeat):
     vect = random.uniform(0, 2 * math.pi)
     vectSpeed = 0
     hitObjectsPos = []
+    timesWentBack = 0
     i = 0
     while i < len(cleanedInputs):
         correctFlag = False
@@ -147,10 +148,13 @@ def computePositions(cleanedInputs, beatLength, maxTurnSpeed, distancePerBeat):
             if correctFlag:
                 hitObjectsPos.append(pos)
                 i += 1
-            elif tries == 42:
-                print(i, backTo)
+            elif tries == 42 and timesWentBack < 100:
                 i = backTo
                 hitObjectsPos = hitObjectsPos[:backTo]
+                timesWentBack += 1
+            elif tries == 42:
+                hitObjectsPos.append(pos)
+                i += 1
 
     return hitObjectsPos
 
